@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http_demo/shared_preferences.dart';
+import 'package:http_demo/list.dart';
+import 'package:http_demo/ExpansionTile.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(CityDemo());
 
 class MyApp extends StatefulWidget {
   @override
@@ -13,35 +16,58 @@ class _MyappState extends State<MyApp> {
   String showResult = '';
 
   Future<CommonModel> fetchGet() async {
-    final response = await http.get('http://www.devio.org/io/flutter_app/json/test_common_model.json');
-    final result = json.decode(response.body);
+    final response = await http
+        .get('http://www.devio.org/io/flutter_app/json/test_common_model.json');
+    Utf8Decoder utf8decoder = Utf8Decoder(); // 解决返回中文展示乱码的问题
+    final result = json.decode(utf8decoder.convert(response
+        .bodyBytes)); // TODO: Utf8Decoder convert 必须修改response的bodyBytes
     return CommonModel.fromJson(result);
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title:  Text('http_demo'),
-        ),
-        body: Column(
-          children: <Widget>[
-            InkWell(
-              child: Text('Come on', style: TextStyle(fontSize: 26),),
-              onTap: () {
-                fetchGet().then((CommonModel value) {
-                  setState(() {
-                    showResult = '请求结果: \nhideAppBar: ${value.hideAppBar} \nicon: ${value.icon} \ntitle: ${value.title} \nurl: ${value.url} \nstatusBarColor: ${value.statusBarColor}';
-                  });
-                });
-              },
-            ),
-            Text(showResult),
-          ],
-        ),
-      )
-    );
+        home: Scaffold(
+      appBar: AppBar(
+        title: Text('http_demo'),
+      ),
+      body: FutureBuilder<CommonModel>(
+          future: fetchGet(),
+          builder: (BuildContext context, AsyncSnapshot<CommonModel> snapshot) {
+            switch (snapshot.connectionState) {
+              // 判断网络返回状态
+              case ConnectionState.none:
+                return Text('Input a URL to Start');
+
+              case ConnectionState.waiting:
+                return Center(
+                  child: new CircularProgressIndicator(),
+                ); // 如果是等待状态则展示一个等待指示器
+
+              case ConnectionState.active:
+                return Text('');
+
+              case ConnectionState.done:
+                if (snapshot.hasError) {
+                  // 注意在请求完成之后，需要判断是否有错误 有过有错误则展示错误
+                  return Text(
+                    '${snapshot.error}',
+                    style: TextStyle(fontSize: 20, color: Colors.red),
+                  );
+                } else {
+                  return new Column(
+                    children: <Widget>[
+                      Text('icon: ${snapshot.data.icon}'),
+                      Text('statusBarColor: ${snapshot.data.statusBarColor}'),
+                      Text('title: ${snapshot.data.title}'),
+                      Text('url: ${snapshot.data.url}'),
+                      Text('hideAppBar: ${snapshot.data.hideAppBar}')
+                    ],
+                  );
+                }
+            }
+          }),
+    ));
   }
 }
 
